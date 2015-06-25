@@ -67,6 +67,33 @@ func (api *OssApi) PutObject(object string, contents []byte, contentType string)
 	return nil
 }
 
+type Header struct {
+	http.Header
+}
+
+func (header *Header) GetContentLength() int64 {
+	contentLengthString := header.Get("Content-Length")
+	lenth, err := strconv.ParseInt(contentLengthString, 10, 64)
+	if err != nil {
+		return 0
+	} else {
+		return lenth
+	}
+}
+
+func (api *OssApi) GetObjectMetadata(object string) (*Header, error) {
+	req := &request{
+		method: "HEAD",
+		object: object,
+	}
+	hresp, err := api.rawQuery(req)
+	if err != nil {
+		return nil, err
+	}
+	defer hresp.Body.Close()
+	return &Header{hresp.Header}, nil
+}
+
 func (api *OssApi) GetObjectAsStream(object string, start int64, end int64) (io.ReadCloser, int, error) {
 	var headers = make(map[string][]string)
 	if start >= 0 || end >= 0 {

@@ -81,7 +81,7 @@ func (api *OssApi) run(req *request) (*http.Response, error) {
 		return nil, err
 	}
 
-	hreq := http.Request{
+	hreq := &http.Request{
 		URL:        u,
 		Method:     req.method,
 		ProtoMajor: 1,
@@ -99,18 +99,18 @@ func (api *OssApi) run(req *request) (*http.Response, error) {
 		hreq.Body = ioutil.NopCloser(req.payload)
 	}
 	if log.GetLevel() == log.DebugLevel {
-		dump, _ := httputil.DumpRequestOut(&hreq, true)
-		log.Debugf("} -> %s\n", dump)
+		dump, _ := httputil.DumpRequestOut(hreq, false)
+		log.Debugf("request } -> %s\n", dump)
 
 	}
 
-	hresp, err := http.DefaultClient.Do(&hreq)
+	hresp, err := http.DefaultClient.Do(hreq)
 	if err != nil {
 		return nil, err
 	}
 	if log.GetLevel() == log.DebugLevel {
-		dump, _ := httputil.DumpRequestOut(&hreq, true)
-		log.Debugf("} -> %s\n", dump)
+		dump, _ := httputil.DumpResponse(hresp, false)
+		log.Debugf("response } -> %s\n", dump)
 
 	}
 	if hresp.StatusCode < 200 && hresp.StatusCode >= 300 {

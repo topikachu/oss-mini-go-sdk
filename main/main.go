@@ -8,10 +8,11 @@ import (
 	"github.com/topikachu/oss"
 	"io"
 	"os"
+	"strings"
 )
 
 type Config struct {
-	AccessKeyId, AccessKeySecret, Region, Bucket string
+	AccessKeyId, AccessKeySecret, Region, Bucket, LogLevel string
 }
 
 func main() {
@@ -27,7 +28,12 @@ func main() {
 		panic(err)
 	}
 
-	log.SetLevel(log.InfoLevel)
+	logLevel, err := log.ParseLevel(strings.ToLower(config.LogLevel))
+	if err != nil {
+		log.SetLevel(log.InfoLevel)
+	} else {
+		log.SetLevel(logLevel)
+	}
 
 	// Region list:
 	// HangZhou         = "oss-cn-hangzhou"
@@ -49,18 +55,25 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	log.Debugf("sent contents")
+	log.Infof("sent contents")
 
 	receivebytes, err := api.GetObjectAsBytes("newossapi")
 	if err != nil {
 		panic(err)
 	}
-	log.Debugf("receive contents, size is %d", len(receivebytes))
+	log.Infof("receive contents, size is %d\n", len(receivebytes))
 
 	if bytes.Compare(sendbytes, receivebytes) != 0 {
 		panic("the received content are not same as sent")
 	}
 
+	header, err := api.GetObjectMetadata("newossapi")
+	if err != nil {
+		panic(err)
+	}
+	log.Infof("file header %+v\n", header)
+	log.Infof("file header date %+v\n", header.Get("Date"))
+	log.Infof("file length %d", header.GetContentLength())
 	r, statusCode, err := api.GetObjectAsStream("newossapi", 0, 19)
 	if err != nil {
 		panic(err)
@@ -69,7 +82,7 @@ func main() {
 	io.Copy(&buffer, r)
 	r.Close()
 
-	log.Debugf("get ranged content, size is %d, status code is %d\n", len(buffer.Bytes()), statusCode)
+	log.Infof("get ranged content, size is %d, status code is %d\n", len(buffer.Bytes()), statusCode)
 
 	r, statusCode, err = api.GetObjectAsStream("newossapi", 19, -1)
 	if err != nil {
@@ -79,7 +92,7 @@ func main() {
 	io.Copy(&buffer, r)
 	r.Close()
 
-	log.Debugf("get ranged content, size is %d, status code is %d\n", len(buffer.Bytes()), statusCode)
+	log.Infof("get ranged content, size is %d, status code is %d\n", len(buffer.Bytes()), statusCode)
 
 	r, statusCode, err = api.GetObjectAsStream("newossapi", 0, -1)
 	if err != nil {
@@ -88,7 +101,7 @@ func main() {
 	buffer.Reset()
 	io.Copy(&buffer, r)
 	r.Close()
-	log.Debugf("get ranged content, size is %d, status code is %d\n", len(buffer.Bytes()), statusCode)
+	log.Infof("get ranged content, size is %d, status code is %d\n", len(buffer.Bytes()), statusCode)
 
 	r, statusCode, err = api.GetObjectAsStream("newossapi", -1, -1)
 	if err != nil {
@@ -97,26 +110,27 @@ func main() {
 	buffer.Reset()
 	io.Copy(&buffer, r)
 	r.Close()
-	log.Debugf("get ranged content, size is %d, status code is %d\n", len(buffer.Bytes()), statusCode)
+	log.Infof("get ranged content, size is %d, status code is %d\n", len(buffer.Bytes()), statusCode)
 
 	context, err := api.InitMultipartUpload("newmulti", "text/plain")
 	if err != nil {
 		panic(err)
 	}
-	log.Debugf("upload context %+v\n", context)
+	log.Infof("upload context %+v\n", context)
 	err = api.UploadMultipart(context, sendbytes, 1)
 	if err != nil {
 		panic(err)
 	}
-	log.Debugf("upload context %+v\n", context)
+	log.Infof("upload context %+v\n", context)
 
 	contexts, err := api.ListMultipartUploads()
 	if err != nil {
 		panic(err)
 	}
-	log.Debugf("upload context %+v\n", contexts)
 
 	for _, context := range contexts {
+		err = api.FetchMultipartUploadParts(context)
+		log.Infof("Abort upload context %+v\n", context)
 		api.AbortMultipart(context)
 	}
 

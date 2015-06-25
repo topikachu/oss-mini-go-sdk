@@ -1,6 +1,8 @@
 {
-		"accessKeyId"     : "keyid"
-		"accessKeySecret" : "keysecret"
-		"region"          : "oss-cn-shenzhen"
-		"bucket"          : "bucketname"
-	}
+    "AccessKeyId": "keyid",
+    "AccessKeySecret": "keysec"
+    "Region": "oss-cn-shenzhen",
+    "Bucket": "BucketName",
+    "LogLevel":"debug"
+
+}

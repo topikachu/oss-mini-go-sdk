@@ -1,9 +1,13 @@
 package oss
 
 import (
+	"bytes"
+	"crypto/md5"
+	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
@@ -19,6 +23,15 @@ func (api *OssApi) prepare(req *request) error {
 	}
 	if req.headers == nil {
 		req.headers = make(map[string][]string)
+	}
+
+	if len(req.payload) != 0 {
+		digest := md5.New()
+		io.Copy(digest, bytes.NewReader(req.payload))
+		sum := digest.Sum(nil)
+		md5b64 := base64.StdEncoding.EncodeToString(sum)
+		req.headers["Content-MD5"] = []string{md5b64}
+		req.headers["Content-Length"] = []string{strconv.FormatInt(int64(len(req.payload)), 10)}
 	}
 
 	req.baseurl = fmt.Sprintf("http://%s.%s.aliyuncs.com", api.bucket, api.region)
@@ -96,10 +109,10 @@ func (api *OssApi) run(req *request) (*http.Response, error) {
 	}
 
 	if req.payload != nil {
-		hreq.Body = ioutil.NopCloser(req.payload)
+		hreq.Body = ioutil.NopCloser(bytes.NewReader(req.payload))
 	}
 	if log.GetLevel() == log.DebugLevel {
-		dump, _ := httputil.DumpRequestOut(hreq, false)
+		dump, _ := httputil.DumpRequestOut(hreq, true)
 		log.Debugf("request } -> %s\n", dump)
 
 	}
@@ -109,11 +122,12 @@ func (api *OssApi) run(req *request) (*http.Response, error) {
 		return nil, err
 	}
 	if log.GetLevel() == log.DebugLevel {
-		dump, _ := httputil.DumpResponse(hresp, false)
+		dump, _ := httputil.DumpResponse(hresp, true)
 		log.Debugf("response } -> %s\n", dump)
 
 	}
-	if hresp.StatusCode < 200 && hresp.StatusCode >= 300 {
+
+	if hresp.StatusCode < 200 || hresp.StatusCode >= 300 {
 		return nil, buildError(hresp)
 	}
 	return hresp, err

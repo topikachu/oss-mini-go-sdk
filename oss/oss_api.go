@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 )
@@ -46,11 +47,61 @@ type request struct {
 	params  url.Values
 	headers http.Header
 	baseurl string
-	payload io.Reader
+	payload []byte
 }
 
-func New(region, accessKeyId, accessKeySecret, bucket string) OssApi {
-	return OssApi{region, accessKeyId, accessKeySecret, bucket}
+func New(region, accessKeyId, accessKeySecret, bucket string) *OssApi {
+	return &OssApi{region, accessKeyId, accessKeySecret, bucket}
+}
+
+func (api *OssApi) ListFiles(object, delimiter, marker string, max int) ([]string, []string, string, error) {
+	params := make(map[string][]string)
+	if object != "" {
+		params["prefix"] = []string{object}
+	}
+	if delimiter != "" {
+		params["delimiter"] = []string{delimiter}
+	}
+	if marker != "" {
+		params["marker"] = []string{marker}
+	}
+
+	if max > 0 && max < 1000 {
+		params["max-keys"] = []string{strconv.Itoa(max)}
+	}
+	req := &request{
+		method: "GET",
+		params: params,
+	}
+
+	var resp struct {
+		Nextmarker  string
+		IsTruncated bool
+		Contents    []struct {
+			Key string
+		}
+		CommonPrefixes struct {
+			Prefix []string
+		}
+	}
+
+	err := api.query(req, &resp)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	var contents []string
+
+	for _, content := range resp.Contents {
+		contents = append(contents, content.Key)
+	}
+	nextMarker := ""
+
+	if resp.IsTruncated {
+		nextMarker = resp.Nextmarker
+	}
+
+	return contents, resp.CommonPrefixes.Prefix, nextMarker, nil
 }
 
 func (api *OssApi) PutObject(object string, contents []byte, contentType string) error {
@@ -58,10 +109,9 @@ func (api *OssApi) PutObject(object string, contents []byte, contentType string)
 		method: "PUT",
 		object: object,
 		headers: map[string][]string{
-			"Content-Length": {strconv.FormatInt(int64(len(contents)), 10)},
-			"Content-Type":   {contentType},
+			"Content-Type": {contentType},
 		},
-		payload: bytes.NewReader(contents),
+		payload: contents,
 	}
 	return api.query(req, nil)
 	return nil
@@ -94,7 +144,7 @@ func (api *OssApi) GetObjectMetadata(object string) (*Header, error) {
 	return &Header{hresp.Header}, nil
 }
 
-func (api *OssApi) GetObjectAsStream(object string, start int64, end int64) (io.ReadCloser, int, error) {
+func (api *OssApi) GetObjectRange(object string, start, end int64) ([]byte, int, error) {
 	var headers = make(map[string][]string)
 	if start >= 0 || end >= 0 {
 		if start < 0 {
@@ -115,22 +165,17 @@ func (api *OssApi) GetObjectAsStream(object string, start int64, end int64) (io.
 	if err != nil {
 		return nil, -1, err
 	}
-	return hresp.Body, hresp.StatusCode, nil
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, hresp.Body)
+	defer hresp.Body.Close()
+	if err != nil {
+		return nil, 0, err
+	}
+	return buf.Bytes(), hresp.StatusCode, nil
 }
 
-func (api *OssApi) GetObjectAsBytes(object string) ([]byte, error) {
-	reader, _, err := api.GetObjectAsStream(object, -1, -1)
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, reader)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+func (api *OssApi) GetObject(object string) ([]byte, int, error) {
+	return api.GetObjectRange(object, -1, -1)
 }
 
 func (api *OssApi) InitMultipartUpload(object, contentType string) (*UploadContext, error) {
@@ -158,16 +203,39 @@ func (api *OssApi) InitMultipartUpload(object, contentType string) (*UploadConte
 	}, nil
 }
 
-func (api *OssApi) ListMultipartUploads() ([]*UploadContext, error) {
+type ListMultipartUploadsMarker struct {
+	Key, UploadId string
+}
+
+func (api *OssApi) ListMultipartUploads(object string, marker *ListMultipartUploadsMarker, max int) ([]*UploadContext, *ListMultipartUploadsMarker, error) {
+	params := map[string][]string{
+		"uploads": {""},
+	}
+	if object != "" {
+		params["prefix"] = []string{object}
+	}
+	if marker != nil {
+		if marker.Key != "" {
+			params["key-marker"] = []string{marker.Key}
+		}
+		if marker.UploadId != "" {
+			params["upload-id-marker"] = []string{marker.UploadId}
+		}
+	}
+
+	if max > 0 && max < 1000 {
+		params["max-uploads"] = []string{strconv.Itoa(max)}
+	}
 	req := &request{
 		method: "GET",
-		params: map[string][]string{
-			"uploads": {""},
-		},
+		params: params,
 	}
 
 	var resp struct {
-		Upload []struct {
+		NextKeyMarker      string
+		NextUploadIdMarker string
+		IsTruncated        bool
+		Upload             []struct {
 			Key      string
 			UploadId string
 		}
@@ -175,7 +243,7 @@ func (api *OssApi) ListMultipartUploads() ([]*UploadContext, error) {
 
 	err := api.query(req, &resp)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var contexts []*UploadContext
 	for _, upload := range resp.Upload {
@@ -184,7 +252,15 @@ func (api *OssApi) ListMultipartUploads() ([]*UploadContext, error) {
 			UploadId: upload.UploadId,
 		})
 	}
-	return contexts, nil
+
+	var nextMarker *ListMultipartUploadsMarker
+	if resp.IsTruncated {
+		nextMarker = &ListMultipartUploadsMarker{resp.NextKeyMarker, resp.NextUploadIdMarker}
+	} else {
+		nextMarker = nil
+	}
+
+	return contexts, nextMarker, nil
 }
 
 func (api *OssApi) FetchMultipartUploadParts(context *UploadContext) error {
@@ -218,14 +294,12 @@ func (api *OssApi) UploadMultipart(context *UploadContext, contents []byte, part
 	req := &request{
 		method: "PUT",
 		object: context.Key,
-		headers: map[string][]string{
-			"Content-Length": {strconv.FormatInt(int64(len(contents)), 10)},
-		},
+
 		params: map[string][]string{
 			"partNumber": {strconv.Itoa(partNumber)},
 			"uploadId":   {context.UploadId},
 		},
-		payload: bytes.NewReader(contents),
+		payload: contents,
 	}
 	hresp, err := api.rawQuery(req)
 	if err != nil {
@@ -251,12 +325,101 @@ func (api *OssApi) CompleteMultipart(context *UploadContext) error {
 	req := &request{
 		method: "POST",
 		object: context.Key,
+
 		params: map[string][]string{
 			"uploadId": {context.UploadId},
 		},
-		payload: bytes.NewReader(data),
+		payload: data,
 	}
 	return api.query(req, nil)
+}
+
+func (api *OssApi) UploadCopyMultipart(context *UploadContext, sourceBucket, sourceObject string, start, end int64, partNumber int) (int64, error) {
+	if sourceBucket == "" {
+		sourceBucket = api.bucket
+	}
+	headers := map[string][]string{
+		"x-oss-copy-source": {"/" + sourceBucket + "/" + sourceObject},
+	}
+	if start >= 0 || end >= 0 {
+		if start < 0 {
+			start = 0
+		}
+		if end >= 0 {
+			headers["x-oss-copy-source-range"] = []string{fmt.Sprintf("bytes=%d-%d", start, end)}
+		} else {
+			headers["x-oss-copy-source-range"] = []string{fmt.Sprintf("bytes=%d-", start)}
+		}
+	}
+	req := &request{
+		method:  "PUT",
+		object:  context.Key,
+		headers: headers,
+		params: map[string][]string{
+			"partNumber": {strconv.Itoa(partNumber)},
+			"uploadId":   {context.UploadId},
+		},
+	}
+
+	hresp, err := api.rawQuery(req)
+	if err != nil {
+		return 0, err
+	}
+	var resp struct {
+		ETag string
+	}
+	err = xml.NewDecoder(hresp.Body).Decode(&resp)
+	hresp.Body.Close()
+	if err != nil {
+		return 0, err
+	}
+	contentRange := hresp.Header.Get("Content-Range")
+	re := regexp.MustCompile("bytes (\\d+)-(\\d+)/(\\d+)")
+	matchResult := re.FindAllStringSubmatch(contentRange, -1)
+	remaining := int64(0)
+	if len(matchResult) != 0 {
+		total, _ := strconv.ParseInt(matchResult[0][3], 10, 64)
+		read, _ := strconv.ParseInt(matchResult[0][2], 10, 64)
+		remaining = total - read - 1
+	}
+	context.addPart(partNumber, resp.ETag)
+	return remaining, nil
+
+}
+
+func (api *OssApi) Copy(sourceBucket, sourceObject, target, contentType string, chunkSize int64) error {
+
+	if chunkSize < 100*1024 {
+		chunkSize = 100 * 1024
+	}
+
+	context, err := api.InitMultipartUpload(target, contentType)
+	start := int64(0)
+	end := int64(start + chunkSize - 1)
+	partNumber := 1
+	for {
+		remaining, err := api.UploadCopyMultipart(context, sourceBucket, sourceObject, start, end, partNumber)
+		if err != nil {
+			return err
+			defer api.AbortMultipart(context)
+		}
+		if remaining == 0 {
+			break
+		}
+		start += chunkSize
+		if remaining > chunkSize {
+			end += chunkSize
+		} else {
+			end = -1
+		}
+		partNumber++
+	}
+	err = api.CompleteMultipart(context)
+	if err != nil {
+		defer api.AbortMultipart(context)
+		return err
+	}
+	return nil
 }
 
 func (api *OssApi) AbortMultipart(context *UploadContext) error {
@@ -266,6 +429,30 @@ func (api *OssApi) AbortMultipart(context *UploadContext) error {
 		params: map[string][]string{
 			"uploadId": {context.UploadId},
 		},
+	}
+	return api.query(req, nil)
+}
+
+func (api *OssApi) Delete(objects ...string) error {
+	type Object struct {
+		Key string
+	}
+	var multipleDelete struct {
+		XMLName xml.Name `xml:"Delete"`
+		Quiet   bool
+		Objects []Object `xml:"Object"`
+	}
+	multipleDelete.Quiet = true
+	for _, object := range objects {
+		multipleDelete.Objects = append(multipleDelete.Objects, Object{object})
+	}
+	data, _ := xml.Marshal(&multipleDelete)
+	req := &request{
+		method: "POST",
+		params: map[string][]string{
+			"delete": {""},
+		},
+		payload: data,
 	}
 	return api.query(req, nil)
 }

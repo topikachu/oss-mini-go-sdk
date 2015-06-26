@@ -39,10 +39,22 @@ var ossSubResourceList = map[string]bool{
 	"response-expires":             true,
 }
 
+func getSortedKeySlice(m map[string][]string) []string {
+	keys := make([]string, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func (api *OssApi) sign(method, object string, params, headers map[string][]string) {
 	var md5, ctype, date, xoss string
 	var xossHeaders, ossSubResources []string
-	for k, v := range headers {
+
+	headerKeys := getSortedKeySlice(headers)
+	for _, k := range headerKeys {
+		v := headers[k]
 		k = strings.ToLower(k)
 		switch k {
 		case "content-md5":
@@ -57,12 +69,15 @@ func (api *OssApi) sign(method, object string, params, headers map[string][]stri
 			}
 		}
 	}
+
 	if len(xossHeaders) > 0 {
-		sort.StringSlice(xossHeaders).Sort()
 		xoss = strings.Join(xossHeaders, "\n") + "\n"
 	}
 
-	for k, v := range params {
+	//var paramKeys:= range
+	paramKeys := getSortedKeySlice(params)
+	for _, k := range paramKeys {
+		v := params[k]
 		if ossSubResourceList[k] {
 			for _, vi := range v {
 				if vi == "" {

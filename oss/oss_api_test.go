@@ -57,6 +57,7 @@ var multipartFile4 = "test/" + randomFolder + "multiobject4"
 var multipartFile5 = "test/" + randomFolder + "multiobject5"
 var multipartFile6 = "test/" + randomFolder + "multiobject6"
 var objectFile2 = "test/" + randomFolder + "objectFile2"
+var objectFile3 = "test/" + randomFolder + "objectFile3"
 
 var folderNameForList = "test/" + randomFolder + "listfolder/"
 var fileNameForList = []string{
@@ -366,6 +367,20 @@ func TestCopy(t *testing.T) {
 
 }
 
+func TestCopyBigChunk(t *testing.T) {
+
+	err := api.Copy("", objectFile1, objectFile3, "text/plain", 5*1024*1024)
+	if err != nil {
+		t.Errorf("cant init multi upload", err)
+	}
+
+	received, _, err := api.GetObject(objectFile3)
+	if bytes.Compare(contents, received) != 0 {
+		t.Errorf("the received content are not same as sent")
+	}
+
+}
+
 func TestListFiles(t *testing.T) {
 	for _, fileName := range fileNameForList {
 		api.PutObject(fileName, contents, "text/plain")
@@ -400,83 +415,10 @@ func TestListFiles(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	err := api.Delete(folderNameForList)
+	log.SetLevel(log.DebugLevel)
+	err := api.Delete(fileNameForList...)
+	setLogLevelFromConfig()
 	if err != nil {
 		t.Errorf("delete failed", err)
 	}
 }
-
-// func TestPut(t *testing.T) {
-// 	bucket := New(DefaultRegion, accessId, accessKey).Bucket(testBucket)
-// 	data := []byte("helloworld")
-// 	err := bucket.Put("readme", data, "text/plain", Private)
-// 	if err != nil {
-// 		t.Errorf("Unable put object:", err)
-// 	}
-// }
-
-// func TestGet(t *testing.T) {
-// 	bucket := New(DefaultRegion, accessId, accessKey).Bucket(testBucket)
-// 	data, err := bucket.Get("readme")
-// 	if err != nil {
-// 		t.Errorf("Unable get object:", err)
-// 		return
-// 	}
-// 	log.Println(string(data))
-// }
-
-// func TestDel(t *testing.T) {
-// 	bucket := New(DefaultRegion, accessId, accessKey).Bucket(testBucket)
-// 	err := bucket.Del("readme")
-// 	if err != nil {
-// 		t.Errorf("Unable del object:", err)
-// 	}
-// }
-
-// func TestDelBucket(t *testing.T) {
-// 	bucket := New(DefaultRegion, accessId, accessKey).Bucket(testBucket)
-// 	err := bucket.DelBucket()
-// 	if err != nil {
-// 		t.Errorf("Unable del bucket:", err)
-// 	}
-// }
-
-// func TestURL(t *testing.T) {
-// 	bucket := New(DefaultRegion, accessId, accessKey).Bucket(testBucket)
-// 	url := bucket.URL("readme")
-// 	if url != "http://oss.aliyuncs.com/pinidea-test/readme" {
-// 		t.Errorf("Unable get correct url:", url)
-// 	}
-// }
-
-// func TestPutBuceketWithRegion(t *testing.T) {
-// 	bucket := New(QingDao, accessId, accessKey).Bucket("pinidea-test111")
-// 	err := bucket.PutBucket(PublicRead)
-// 	if err != nil {
-// 		t.Errorf("Unable put bucket:", err)
-// 	}
-// }
-
-// func TestPutWithRegion(t *testing.T) {
-// 	bucket := New(QingDao, accessId, accessKey).Bucket("pinidea-test111")
-// 	data := []byte("helloworld")
-// 	err := bucket.Put("readme", data, "text/plain", Private)
-// 	if err != nil {
-// 		t.Errorf("Unable put object:", err)
-// 	}
-// }
-
-// func TestDelWithRegion(t *testing.T) {
-// 	bucket := New(QingDao, accessId, accessKey).Bucket("pinidea-test111")
-// 	if err := bucket.Del("readme"); err != nil {
-// 		t.Errorf("Unable del with region", err)
-// 	}
-// }
-
-// func TestDelBucketWithRegion(t *testing.T) {
-// 	bucket := New(QingDao, accessId, accessKey).Bucket("pinidea-test111")
-// 	err := bucket.DelBucket()
-// 	if err != nil {
-// 		t.Errorf("Unable del bucket with region", err)
-// 	}
-// }

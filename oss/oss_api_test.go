@@ -124,7 +124,7 @@ func TestGetObjectMetadata(t *testing.T) {
 }
 
 func TestGetObject(t *testing.T) {
-	received, _, err := api.GetObject(objectFile1)
+	received, err := api.GetObject(objectFile1)
 	if err != nil {
 		t.Errorf("Unable get object: %s", objectFile1, err)
 	}
@@ -219,7 +219,7 @@ func TestMultiUpload(t *testing.T) {
 	if err != nil {
 		t.Errorf("cant complete multi part", err)
 	}
-	received, _, err := api.GetObject(multipartFile1)
+	received, err := api.GetObject(multipartFile1)
 	if bytes.Compare(contents, received) != 0 {
 		t.Errorf("the received content are not same as sent")
 	}
@@ -294,7 +294,7 @@ func TestUploadCopyMultipart(t *testing.T) {
 		t.Errorf("cant complete multi part", err)
 	}
 
-	received, _, err := api.GetObject(multipartFile4)
+	received, err := api.GetObject(multipartFile4)
 	if bytes.Compare(contents, received) != 0 {
 		t.Errorf("the received content are not same as sent")
 	}
@@ -321,7 +321,7 @@ func TestUploadCopyMultipartStartEnd(t *testing.T) {
 		t.Errorf("cant complete multi part", err)
 	}
 
-	received, _, err := api.GetObject(multipartFile5)
+	received, err := api.GetObject(multipartFile5)
 	if bytes.Compare(contents[10:21], received) != 0 {
 		t.Errorf("the received content are not same as sent")
 	}
@@ -346,7 +346,7 @@ func TestUploadCopyMultipartSingleStart(t *testing.T) {
 		t.Errorf("cant complete multi part", err)
 	}
 
-	received, _, err := api.GetObject(multipartFile6)
+	received, err := api.GetObject(multipartFile6)
 	if bytes.Compare(contents[10:], received) != 0 {
 		t.Errorf("the received content are not same as sent")
 	}
@@ -360,7 +360,7 @@ func TestCopy(t *testing.T) {
 		t.Errorf("cant init multi upload", err)
 	}
 
-	received, _, err := api.GetObject(objectFile2)
+	received, err := api.GetObject(objectFile2)
 	if bytes.Compare(contents, received) != 0 {
 		t.Errorf("the received content are not same as sent")
 	}
@@ -374,7 +374,7 @@ func TestCopyBigChunk(t *testing.T) {
 		t.Errorf("cant init multi upload", err)
 	}
 
-	received, _, err := api.GetObject(objectFile3)
+	received, err := api.GetObject(objectFile3)
 	if bytes.Compare(contents, received) != 0 {
 		t.Errorf("the received content are not same as sent")
 	}
@@ -415,9 +415,7 @@ func TestListFiles(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	log.SetLevel(log.DebugLevel)
 	err := api.Delete(fileNameForList...)
-	setLogLevelFromConfig()
 	if err != nil {
 		t.Errorf("delete failed", err)
 	}

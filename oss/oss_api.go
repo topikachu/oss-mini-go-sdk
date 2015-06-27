@@ -174,8 +174,9 @@ func (api *OssApi) GetObjectRange(object string, start, end int64) ([]byte, int,
 	return buf.Bytes(), hresp.StatusCode, nil
 }
 
-func (api *OssApi) GetObject(object string) ([]byte, int, error) {
-	return api.GetObjectRange(object, -1, -1)
+func (api *OssApi) GetObject(object string) ([]byte, error) {
+	contents, _, err := api.GetObjectRange(object, -1, -1)
+	return contents, err
 }
 
 func (api *OssApi) InitMultipartUpload(object, contentType string) (*UploadContext, error) {

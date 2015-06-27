@@ -47,7 +47,7 @@ func setLogLevelFromConfig() {
 	}
 }
 
-var randomFolder = "test/" + getNewFileName() + "/"
+var randomFolder = "/test/" + getNewFileName() + "/"
 
 var objectFile1 = randomFolder + "objectFile1"
 var multipartFile1 = randomFolder + "multiobject1"
@@ -131,6 +131,7 @@ func TestGetObjectMetadata(t *testing.T) {
 func TestGetFolderMetadata(t *testing.T) {
 	randomFolderNoSlash := strings.TrimSuffix(randomFolder, "/")
 	files, _, _, _ := api.ListFiles(randomFolderNoSlash, "", "", 1)
+
 	if len(files) != 1 {
 		t.Errorf("can't find the folder")
 	}
@@ -395,6 +396,13 @@ func TestCopyBigChunk(t *testing.T) {
 		t.Errorf("the received content are not same as sent")
 	}
 
+}
+
+func TestListRoot(t *testing.T) {
+	_, _, _, err := api.ListFiles("/", "", "", -1)
+	if err != nil {
+		t.Errorf("cant ListFiles", err)
+	}
 }
 
 func TestListFiles(t *testing.T) {

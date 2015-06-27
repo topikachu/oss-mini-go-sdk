@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -56,6 +57,7 @@ func New(region, accessKeyId, accessKeySecret, bucket string) *OssApi {
 }
 
 func (api *OssApi) ListFiles(object, delimiter, marker string, max int) ([]string, []string, string, error) {
+	object = noramilizeObject(object)
 	params := make(map[string][]string)
 	if object != "" {
 		params["prefix"] = []string{object}
@@ -106,6 +108,7 @@ func (api *OssApi) ListFiles(object, delimiter, marker string, max int) ([]strin
 }
 
 func (api *OssApi) PutObject(object string, contents []byte, contentType string) error {
+	object = noramilizeObject(object)
 	req := &request{
 		method: "PUT",
 		object: object,
@@ -137,6 +140,7 @@ func (header *Header) GetLastModified() (time.Time, error) {
 }
 
 func (api *OssApi) GetObjectMetadata(object string) (*Header, error) {
+	object = noramilizeObject(object)
 	req := &request{
 		method: "HEAD",
 		object: object,
@@ -165,6 +169,7 @@ func (r *ReaderWithBytes) Bytes() []byte {
 }
 
 func (api *OssApi) GetObjectRange(object string, start, end int64) (*ReaderWithBytes, int, error) {
+	object = noramilizeObject(object)
 	var headers = make(map[string][]string)
 	if start >= 0 || end >= 0 {
 		if start < 0 {
@@ -191,11 +196,13 @@ func (api *OssApi) GetObjectRange(object string, start, end int64) (*ReaderWithB
 }
 
 func (api *OssApi) GetObject(object string) ([]byte, error) {
+	object = noramilizeObject(object)
 	r, _, err := api.GetObjectRange(object, -1, -1)
 	return r.Bytes(), err
 }
 
 func (api *OssApi) InitMultipartUpload(object, contentType string) (*UploadContext, error) {
+	object = noramilizeObject(object)
 	req := &request{
 		method: "POST",
 		object: object,
@@ -225,6 +232,10 @@ type ListMultipartUploadsMarker struct {
 }
 
 func (api *OssApi) ListMultipartUploads(object string, marker *ListMultipartUploadsMarker, max int) ([]*UploadContext, *ListMultipartUploadsMarker, error) {
+	object = noramilizeObject(object)
+	if strings.HasPrefix(object, "/") {
+		object = strings.TrimPrefix(object, "/")
+	}
 	params := map[string][]string{
 		"uploads": {""},
 	}
@@ -352,6 +363,7 @@ func (api *OssApi) CompleteMultipart(context *UploadContext) error {
 }
 
 func (api *OssApi) UploadCopyMultipart(context *UploadContext, sourceBucket, sourceObject string, start, end int64, partNumber int) (int64, error) {
+	sourceObject = noramilizeObject(sourceObject)
 	if sourceBucket == "" {
 		sourceBucket = api.bucket
 	}
@@ -405,7 +417,8 @@ func (api *OssApi) UploadCopyMultipart(context *UploadContext, sourceBucket, sou
 }
 
 func (api *OssApi) Copy(sourceBucket, sourceObject, target, contentType string, chunkSize int64) error {
-
+	sourceObject = noramilizeObject(sourceObject)
+	target = noramilizeObject(target)
 	if chunkSize < 100*1024 {
 		chunkSize = 100 * 1024
 	}
@@ -461,6 +474,7 @@ func (api *OssApi) Delete(objects ...string) error {
 	}
 	multipleDelete.Quiet = true
 	for _, object := range objects {
+		object = noramilizeObject(object)
 		multipleDelete.Objects = append(multipleDelete.Objects, Object{object})
 	}
 	data, _ := xml.Marshal(&multipleDelete)
@@ -472,4 +486,11 @@ func (api *OssApi) Delete(objects ...string) error {
 		payload: data,
 	}
 	return api.query(req, nil)
+}
+
+func noramilizeObject(object string) string {
+	if strings.HasPrefix(object, "/") {
+		object = strings.TrimLeft(object, "/")
+	}
+	return object
 }

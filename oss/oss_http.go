@@ -112,7 +112,7 @@ func (api *OssApi) run(req *request) (*http.Response, error) {
 		hreq.Body = ioutil.NopCloser(bytes.NewReader(req.payload))
 	}
 	if log.GetLevel() == log.DebugLevel {
-		dump, _ := httputil.DumpRequestOut(hreq, true)
+		dump, _ := httputil.DumpRequestOut(hreq, false)
 		log.Debugf("request } -> %s\n", dump)
 
 	}
@@ -122,7 +122,7 @@ func (api *OssApi) run(req *request) (*http.Response, error) {
 		return nil, err
 	}
 	if log.GetLevel() == log.DebugLevel {
-		dump, _ := httputil.DumpResponse(hresp, true)
+		dump, _ := httputil.DumpResponse(hresp, false)
 		log.Debugf("response } -> %s\n", dump)
 
 	}

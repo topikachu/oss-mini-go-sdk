@@ -47,19 +47,19 @@ func setLogLevelFromConfig() {
 	}
 }
 
-var randomFolder = getNewFileName() + "/"
+var randomFolder = "test/" + getNewFileName() + "/"
 
-var objectFile1 = "test/" + randomFolder + "objectFile1"
-var multipartFile1 = "test/" + randomFolder + "multiobject1"
-var multipartFile2 = "test/" + randomFolder + "multiobject2"
-var multipartFile3 = "test/" + randomFolder + "multiobject3"
-var multipartFile4 = "test/" + randomFolder + "multiobject4"
-var multipartFile5 = "test/" + randomFolder + "multiobject5"
-var multipartFile6 = "test/" + randomFolder + "multiobject6"
-var objectFile2 = "test/" + randomFolder + "objectFile2"
-var objectFile3 = "test/" + randomFolder + "objectFile3"
+var objectFile1 = randomFolder + "objectFile1"
+var multipartFile1 = randomFolder + "multiobject1"
+var multipartFile2 = randomFolder + "multiobject2"
+var multipartFile3 = randomFolder + "multiobject3"
+var multipartFile4 = randomFolder + "multiobject4"
+var multipartFile5 = randomFolder + "multiobject5"
+var multipartFile6 = randomFolder + "multiobject6"
+var objectFile2 = randomFolder + "objectFile2"
+var objectFile3 = randomFolder + "objectFile3"
 
-var folderNameForList = "test/" + randomFolder + "listfolder/"
+var folderNameForList = randomFolder + "listfolder/"
 var fileNameForList = []string{
 	folderNameForList + "file1",
 	folderNameForList + "file2",
@@ -113,14 +113,27 @@ func TestGetObjectMetadata(t *testing.T) {
 	if header == nil || err != nil {
 		t.Errorf("Unable get object metadata", err)
 	}
-	if header.GetContentLength() <= 0 {
-		t.Errorf("No content length")
+	_, err = header.GetContentLength()
+	if err != nil {
+		t.Errorf("No content length", err)
+	}
+	_, err = header.GetDate()
+	if err != nil {
+		t.Errorf("No Date", err)
+	}
+	_, err = header.GetLastModified()
+	if err != nil {
+		t.Errorf("No LastModified", err)
 	}
 
-	if header.Get("Date") == "" {
-		t.Errorf("No Date")
-	}
+}
 
+func TestGetFolderMetadata(t *testing.T) {
+	randomFolderNoSlash := strings.TrimSuffix(randomFolder, "/")
+	files, _, _, _ := api.ListFiles(randomFolderNoSlash, "", "", 1)
+	if len(files) != 1 {
+		t.Errorf("can't find the folder")
+	}
 }
 
 func TestGetObject(t *testing.T) {
@@ -402,7 +415,15 @@ func TestListFiles(t *testing.T) {
 		t.Errorf("wrong folders return size, expected %d, actual %d", 4, len(folderNames))
 	}
 
+	if strings.HasSuffix(fileNames[0], "/") {
+		t.Errorf("Wrong filen name, has / suffix, %s", fileNames[0])
+	}
+	if !strings.HasSuffix(folderNames[0], "/") {
+		t.Errorf("Wrong folder name, has no / suffix, %s", folderNames[0])
+	}
+
 	fileNames, folderNames, _, err = api.ListFiles(folderNameForList, "", "", -1)
+
 	if err != nil {
 		t.Errorf("cant ListFiles", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"time"
 )
 
 type OssApi struct {
@@ -121,14 +122,18 @@ type Header struct {
 	http.Header
 }
 
-func (header *Header) GetContentLength() int64 {
-	contentLengthString := header.Get("Content-Length")
-	lenth, err := strconv.ParseInt(contentLengthString, 10, 64)
-	if err != nil {
-		return 0
-	} else {
-		return lenth
-	}
+func (header *Header) GetContentLength() (int64, error) {
+	return strconv.ParseInt(header.Get("Content-Length"), 10, 64)
+
+}
+
+func (header *Header) GetDate() (time.Time, error) {
+	return http.ParseTime(header.Get("Date"))
+
+}
+
+func (header *Header) GetLastModified() (time.Time, error) {
+	return http.ParseTime(header.Get("Last-Modified"))
 }
 
 func (api *OssApi) GetObjectMetadata(object string) (*Header, error) {

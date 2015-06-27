@@ -141,7 +141,8 @@ func TestGetObject(t *testing.T) {
 
 func TestGetObjectRangeStartEnd(t *testing.T) {
 
-	received, statusCode, err := api.GetObjectRange(objectFile1, 1, 20)
+	r, statusCode, err := api.GetObjectRange(objectFile1, 1, 20)
+	received := r.Bytes()
 	if err != nil {
 		t.Errorf("Unable get object: %s", objectFile1, err)
 	}
@@ -163,7 +164,8 @@ func TestGetObjectRangeStartEnd(t *testing.T) {
 
 func TestGetObjectRangeOnlyStart(t *testing.T) {
 
-	received, statusCode, err := api.GetObjectRange(objectFile1, 1, -1)
+	r, statusCode, err := api.GetObjectRange(objectFile1, 1, -1)
+	received := r.Bytes()
 	if err != nil {
 		t.Errorf("Unable get object: %s", objectFile1, err)
 	}
@@ -185,7 +187,8 @@ func TestGetObjectRangeOnlyStart(t *testing.T) {
 
 func TestGetObjectRangeNoStartNoEnd(t *testing.T) {
 
-	received, statusCode, err := api.GetObjectRange(objectFile1, -1, -1)
+	r, statusCode, err := api.GetObjectRange(objectFile1, -1, -1)
+	received := r.Bytes()
 	if err != nil {
 		t.Errorf("Unable get object: %s", objectFile1, err)
 	}

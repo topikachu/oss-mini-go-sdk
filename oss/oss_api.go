@@ -144,7 +144,22 @@ func (api *OssApi) GetObjectMetadata(object string) (*Header, error) {
 	return &Header{hresp.Header}, nil
 }
 
-func (api *OssApi) GetObjectRange(object string, start, end int64) ([]byte, int, error) {
+type ReaderWithBytes struct {
+	io.ReadCloser
+	bytes []byte
+}
+
+func (r *ReaderWithBytes) Bytes() []byte {
+	if r.bytes != nil {
+		return r.bytes
+	}
+	var buffer bytes.Buffer
+	buffer.ReadFrom(r)
+	r.bytes = buffer.Bytes()
+	return r.bytes
+}
+
+func (api *OssApi) GetObjectRange(object string, start, end int64) (*ReaderWithBytes, int, error) {
 	var headers = make(map[string][]string)
 	if start >= 0 || end >= 0 {
 		if start < 0 {
@@ -163,20 +178,16 @@ func (api *OssApi) GetObjectRange(object string, start, end int64) ([]byte, int,
 	}
 	hresp, err := api.rawQuery(req)
 	if err != nil {
+		hresp.Body.Close()
 		return nil, -1, err
 	}
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, hresp.Body)
-	defer hresp.Body.Close()
-	if err != nil {
-		return nil, 0, err
-	}
-	return buf.Bytes(), hresp.StatusCode, nil
+
+	return &ReaderWithBytes{hresp.Body, nil}, hresp.StatusCode, nil
 }
 
 func (api *OssApi) GetObject(object string) ([]byte, error) {
-	contents, _, err := api.GetObjectRange(object, -1, -1)
-	return contents, err
+	r, _, err := api.GetObjectRange(object, -1, -1)
+	return r.Bytes(), err
 }
 
 func (api *OssApi) InitMultipartUpload(object, contentType string) (*UploadContext, error) {

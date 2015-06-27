@@ -188,7 +188,6 @@ func (api *OssApi) GetObjectRange(object string, start, end int64) (*ReaderWithB
 	}
 	hresp, err := api.rawQuery(req)
 	if err != nil {
-		hresp.Body.Close()
 		return nil, -1, err
 	}
 
@@ -198,7 +197,10 @@ func (api *OssApi) GetObjectRange(object string, start, end int64) (*ReaderWithB
 func (api *OssApi) GetObject(object string) ([]byte, error) {
 	object = noramilizeObject(object)
 	r, _, err := api.GetObjectRange(object, -1, -1)
-	return r.Bytes(), err
+	if err != nil {
+		return nil, err
+	}
+	return r.Bytes(), nil
 }
 
 func (api *OssApi) InitMultipartUpload(object, contentType string) (*UploadContext, error) {
